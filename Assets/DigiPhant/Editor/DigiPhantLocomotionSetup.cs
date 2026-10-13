@@ -9,6 +9,22 @@ namespace DigiPhant.Editor
 {
     public static class DigiPhantLocomotionSetup
     {
+        [MenuItem("DigiPhant/Configure Three Performer Body Controls")]
+        public static void ConfigureThreePerformerBodyControls()
+        {
+            var controls = UnityEngine.Object.FindAnyObjectByType<DigiPhantController>();
+            if (!controls) throw new InvalidOperationException("Open a DigiPhant scene first.");
+            Undo.RecordObject(controls, "Configure three performer body controls");
+            var locomotion = controls.GetComponent<DigiPhantLocomotion>();
+            if (locomotion != null) Undo.RecordObject(locomotion, "Configure three performer body controls");
+            controls.SetPerformerCount(3);
+            if (locomotion != null && locomotion.steering.sources.Length == 1 && locomotion.steering.sources[0].movement == Movement.Lean)
+                locomotion.steering.sources[0].performer = 2;
+            EditorUtility.SetDirty(controls);
+            if (locomotion != null) EditorUtility.SetDirty(locomotion);
+            EditorSceneManager.MarkSceneDirty(controls.gameObject.scene);
+            Debug.Log("DIGIPHANT_THREE_PERFORMER_BODY_CONTROLS_CONFIGURED");
+        }
         [MenuItem("DigiPhant/Add Locomotion To Open Scene")]
         public static void AddToOpenScene()
         {
@@ -43,7 +59,8 @@ namespace DigiPhant.Editor
             locomotion.runLeft = Clip("runleft");
             locomotion.runRight = Clip("runright");
             locomotion.drink = Clip("drink", false);
-            foreach (var c in controls.controls) c.locomotionWeight = c.label.Contains("leg") ? .35f : 1;
+            foreach (var c in controls.controls)
+                c.locomotionWeight = c.label == "Front left leg" || c.label == "Front right leg" ? 1 : c.label.Contains("leg") ? .35f : 1;
             var stage = GameObject.Find("Stage");
             if (stage)
             {

@@ -44,10 +44,10 @@ namespace DigiPhant.Editor
                 controls.Add(new BoneControl { label = label, performer = person, movement = input,
                     bones = targets, localAxis = targets[0].InverseTransformDirection(axis).normalized, degrees = degrees });
             }
-            Add("Front left leg", 1, Movement.LeftFootLift, new[] { "l_Humerus" }, Vector3.right, -25);
-            Add("Front right leg", 1, Movement.RightFootLift, new[] { "r_Humerus" }, Vector3.right, -25);
-            Add("Rear left leg", 2, Movement.LeftFootLift, new[] { "l_Femur" }, Vector3.right, -25);
-            Add("Rear right leg", 2, Movement.RightFootLift, new[] { "r_Femur" }, Vector3.right, -25);
+            Add("Front left leg", 2, Movement.LeftHandHeight, new[] { "l_Humerus" }, Vector3.right, -25);
+            Add("Front right leg", 2, Movement.RightHandHeight, new[] { "r_Humerus" }, Vector3.right, -25);
+            Add("Rear left leg", 2, Movement.LeftFootLift, new[] { "l_Femur" }, Vector3.right, -25); controls[controls.Count - 1].disabled = true;
+            Add("Rear right leg", 2, Movement.RightFootLift, new[] { "r_Femur" }, Vector3.right, -25); controls[controls.Count - 1].disabled = true;
             Add("Head turn", 3, Movement.Lean, new[] { "Head" }, Vector3.up, 25);
             Add("Trunk curl", 3, Movement.RightHandHeight, Enumerable.Range(1, 7).Select(i => "Trunk" + i).ToArray(), Vector3.right, 12);
             Add("Left ear", 3, Movement.ArmSpread, new[] { "l_Ear1" }, Vector3.up, 25);
@@ -134,6 +134,10 @@ namespace DigiPhant.Editor
             EditorSceneManager.OpenScene(ScenePath);
             var c = UnityEngine.Object.FindAnyObjectByType<DigiPhantController>();
             void Check(bool ok, string message) { if (!ok) throw new Exception(message); }
+            Check(c != null, "Missing DigiPhant controller");
+            // The template is intentionally serialized as a solo starter. These
+            // role fixtures exercise the configured three-performer mapping.
+            c.SetPerformerCount(3);
             Check(c != null && c.controls.Length == 9, "Expected nine default controls");
             Check(c.controls.All(x => x.bones.Length > 0 && x.bones.All(b => b != null)), "Missing rig reference");
             Check(UnityEngine.Object.FindObjectsByType<Animator>().All(a => !a.enabled), "Animator conflicts with puppet");
@@ -148,16 +152,16 @@ namespace DigiPhant.Editor
             c.ResetControls();
             Check(Quaternion.Angle(initial, bone.localRotation) < .01f, "Reset failed");
             c.inputMode = InputMode.Camera;
-            string packet = "{\"version\":1,\"people\":[{\"slot\":1,\"values\":[0,0,1,0,0,0],\"confidence\":[1,1,1,1,1,1]}]}";
+            string packet = "{\"version\":1,\"people\":[{\"slot\":1,\"values\":[0,0,0,0,0,0],\"confidence\":[1,1,1,1,1,1]},{\"slot\":2,\"values\":[1,0,0,0,0,0],\"confidence\":[1,1,1,1,1,1]}]}";
             var baseline = new PoseFrame { version = 1, people = Enumerable.Range(1, 3).Select(i => new PerformerFrame {
                 slot = i, values = new float[6], confidence = Enumerable.Repeat(1f, 6).ToArray() }).ToArray() };
             Check(c.AcceptPacket(JsonUtility.ToJson(baseline), 10), "Baseline rejected");
             c.InvalidateCalibration();
             var lowConfidence = JsonUtility.FromJson<PoseFrame>(JsonUtility.ToJson(baseline));
-            lowConfidence.people[0].confidence[(int)Movement.LeftFootLift] = .2f;
+            lowConfidence.people[1].confidence[(int)Movement.LeftHandHeight] = .2f;
             Check(c.AcceptPacket(JsonUtility.ToJson(lowConfidence), 10), "Low-confidence packet rejected");
             Check(!c.CalibrateAt(10), "Low-confidence movement was calibrated");
-            Check(c.Status.Contains("Front left leg") && c.Status.Contains("Performer 1") &&
+            Check(c.Status.Contains("Front left leg") && c.Status.Contains("Performer 2") &&
                 c.Status.Contains("confidence is too low") && c.Status.Contains("20%") &&
                 c.Status.Contains("50%") && !c.IsCalibrated,
                 "Low-confidence calibration did not explain the failing movement and threshold");
@@ -211,8 +215,9 @@ namespace DigiPhant.Editor
             Check(c.performerCount == 4 && c.controls.Single(x => x.label == "Trunk curl").performer == 4, "Four-person preset failed");
             Three();
             Check(c.controls.Single(x => x.label == "Head turn").performer == 1 &&
-                c.controls.Single(x => x.label == "Front left leg").performer == 1 &&
-                c.controls.Single(x => x.label == "Rear left leg").performer == 2 &&
+                c.controls.Single(x => x.label == "Front left leg").performer == 2 &&
+                c.controls.Single(x => x.label == "Front left leg").movement == Movement.LeftHandHeight &&
+                c.controls.Single(x => x.label == "Rear left leg").disabled &&
                 c.controls.Single(x => x.label == "Tail sway").performer == 2 &&
                 c.controls.Single(x => x.label == "Trunk curl").performer == 3 &&
                 c.controls.Single(x => x.label == "Left ear").performer == 3 &&
@@ -224,7 +229,7 @@ namespace DigiPhant.Editor
             baseline.upperBodyOnly = true;
             Check(c.AcceptPacket(JsonUtility.ToJson(baseline), 40), "Seated packet rejected");
             Check(c.CalibrateAt(40), "Seated calibration failed");
-            baseline.people[0].values[2] = 1;
+            baseline.people[1].values[(int)Movement.LeftHandHeight] = 1;
             Check(c.AcceptPacket(JsonUtility.ToJson(baseline), 40), "Seated hand-to-leg packet rejected");
             c.ApplyControls(40, 1);
             Check(Quaternion.Angle(initial, bone.localRotation) > 10, "Seated hand input failed to drive leg");

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Playables;
@@ -56,6 +57,15 @@ namespace DigiPhant
         [Range(-1, 1)] public float thumbDownRightEarValue = 1;
         [Range(.5f, 6)] public float earFlapFrequency = 2.5f;
         [Range(-1, 1)] public float closedFistTrunkValue = 1;
+        [Header("P1 standing (calibrated right-hand height)")]
+        [Tooltip("Enter standing when P1's right-hand-height delta rises above this normalized value. In upper-body mode this is shoulder-midpoint minus wrist height, divided by shoulder width.")]
+        [Range(.1f, 2)] public float standEnterThreshold = .6f;
+        [Tooltip("Leave standing only below this lower threshold. The gap prevents rapid switching at the boundary.")]
+        [Range(0, 1.5f)] public float standExitThreshold = .35f;
+        [Range(.05f, 1)] public float standBlendSeconds = .6f;
+        [Range(.05f, 1)] public float standInputSmoothingSeconds = .15f;
+        [Range(0, 70)] public float standSpineDegrees = 45;
+        [Range(-1, 1)] public float testStand;
         public MovementDriver forward = new MovementDriver { sources = new[] { new MovementSource { movement = Movement.LeftHandHeight } } };
         // In the three-performer upper-body arrangement P1 drives travel speed
         // and P2's shoulder tilt steers the shared travel root.
@@ -79,6 +89,8 @@ namespace DigiPhant
         public float DrinkWeight => Mathf.Clamp01(drinkWeight);
         public float BoneOverlayWeight => 1 - DrinkWeight;
         public float AnimationWeightSum { get; private set; }
+        public bool IsStandingRequested => standRequested;
+        public float StandWeight => standWeight;
         bool GestureActionsActive => enableGestureActions && controller != null &&
             controller.enableGestureActions && controller.inputMode == InputMode.Camera;
         DigiPhantController controller;
@@ -99,27 +111,37 @@ namespace DigiPhant
         float throttle, turn, cycle;
         string activeGesture = "None";
         float leftEarGestureValue, rightEarGestureValue, trunkGestureValue, drinkWeight, drinkTime, earFlapPhase;
-        bool drinkRequested, victoryLatched;
+        bool drinkRequested, victoryLatched, victoryPending;
+        bool standRequested, standInputValid = true;
+        float standInput, standWeight;
+        Transform[] standSpineBones;
+        Vector3[] standSpineAxes;
+        SkinnedMeshRenderer standingRenderer;
+        Bounds originalRendererBounds;
 
         void OnEnable() { controller = GetComponent<DigiPhantController>(); }
+        void OnValidate()
+        {
+            standExitThreshold = Mathf.Min(standExitThreshold, standEnterThreshold - .01f);
+        }
         public void SetGesture(string gesture, bool freshSnapshot)
         {
             if (!GestureActionsActive || !freshSnapshot)
             {
                 activeGesture = "None";
                 drinkRequested = false;
+                victoryPending = false;
                 return;
             }
             activeGesture = gesture ?? "None";
             if (activeGesture != "Victory") victoryLatched = false;
-            if (activeGesture == "Victory" && !victoryLatched)
+            if (activeGesture == "Victory" && !victoryLatched && !victoryPending)
             {
-                victoryLatched = true;
                 if (!enableLocomotion) GestureStatus = "Locomotion is disabled; drink action is unavailable.";
-                else if (drink != null) { drinkRequested = true; drinkTime = 0; GestureStatus = null; }
+                else if (drink != null) { victoryPending = true; GestureStatus = null; }
                 else GestureStatus = "Drink clip is not assigned; continuing locomotion.";
             }
-            if (activeGesture != "Victory") drinkRequested = false;
+            if (activeGesture != "Victory") { drinkRequested = false; victoryPending = false; }
         }
         public void ClearGestureActions()
         {
@@ -127,8 +149,13 @@ namespace DigiPhant
             leftEarGestureValue = rightEarGestureValue = trunkGestureValue = 0;
             drinkWeight = drinkTime = 0;
             earFlapPhase = 0;
-            drinkRequested = victoryLatched = false;
+            drinkRequested = victoryLatched = victoryPending = false;
             GestureStatus = null;
+        }
+        public void ForceLower()
+        {
+            standRequested = false;
+            standInput = 0;
         }
         public bool ShouldGestureOwn(string controlLabel)
         {
@@ -155,6 +182,11 @@ namespace DigiPhant
             motionRotation = animationMotionRoot.localRotation;
             foreach (var bone in elephantAnimator.GetComponentsInChildren<Transform>())
                 restPose[bone] = new Pose(bone.localPosition, bone.localRotation);
+            standSpineBones = new[] { "elephant_Spine1_bone", "elephant_Spine2_bone", "elephant_Spine3_bone" }
+                .Select(name => elephantAnimator.GetComponentsInChildren<Transform>().FirstOrDefault(t => t.name == name)).Where(t => t != null).ToArray();
+            standSpineAxes = standSpineBones.Select(t => t.InverseTransformDirection(travelRoot.right).normalized).ToArray();
+            standingRenderer = elephantAnimator.GetComponentInChildren<SkinnedMeshRenderer>();
+            if (standingRenderer) originalRendererBounds = standingRenderer.localBounds;
             initialised = true;
             return true;
         }
@@ -166,6 +198,7 @@ namespace DigiPhant
             previousRootMotion = elephantAnimator.applyRootMotion;
             previousCulling = elephantAnimator.cullingMode;
             previousController = elephantAnimator.runtimeAnimatorController;
+            ExpandStandingBounds();
             elephantAnimator.runtimeAnimatorController = null;
             elephantAnimator.applyRootMotion = false;
             elephantAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
@@ -206,6 +239,11 @@ namespace DigiPhant
             if (controller == null) controller = GetComponent<DigiPhantController>();
             if (!DriverInputsVisible(forward, "Forward", now, out issue)) return false;
             if (!DriverInputsVisible(steering, "Steering", now, out issue)) return false;
+            if (controller.TryGetMovementReadinessIssue(1, Movement.RightHandHeight, now, out string standingIssue))
+            {
+                issue = "Standing input: " + standingIssue;
+                return false;
+            }
             return true;
         }
         bool DriverInputsVisible(MovementDriver driver, string label, float now, out string issue)
@@ -246,6 +284,10 @@ namespace DigiPhant
             leftEarGestureValue = Mathf.Lerp(leftEarGestureValue, desiredLeftEar, gestureBlend);
             rightEarGestureValue = Mathf.Lerp(rightEarGestureValue, desiredRightEar, gestureBlend);
             trunkGestureValue = Mathf.Lerp(trunkGestureValue, desiredTrunk, gestureBlend);
+            UpdateStandingInput(now, dt);
+            // Standing has priority over a full-body drink clip. Fade it out as
+            // soon as the raised-hand state is requested, before applying bones.
+            if (standRequested && drinkRequested) { drinkRequested = false; victoryPending = false; }
             if (!enableLocomotion)
             {
                 drinkRequested = false;
@@ -263,13 +305,20 @@ namespace DigiPhant
                 GestureStatus = "Locomotion setup is incomplete; drink action is unavailable.";
                 return false;
             }
-            if (!drink && drinkRequested)
+            if (!drink && (drinkRequested || victoryPending))
             {
                 drinkRequested = false;
                 drinkWeight = 0;
                 GestureStatus = "Drink clip is not assigned; continuing locomotion.";
             }
             else if (drinkRequested && drinkTime >= drink.length) drinkRequested = false;
+            if (victoryPending && !drinkRequested && standWeight < .001f && !standRequested && activeGesture == "Victory")
+            {
+                drinkRequested = true;
+                victoryPending = false;
+                victoryLatched = true; // Consume only when the one-shot actually begins.
+                drinkTime = 0;
+            }
             drinkWeight = Mathf.Lerp(drinkWeight, drinkRequested ? 1 : 0, gestureBlend);
             if (drink)
             {
@@ -286,7 +335,10 @@ namespace DigiPhant
                 bool turning = steering.TryRead(controller, now, out desiredTurn);
                 valid = moving && turning;
             }
-            if (!valid || IsDrinkActive) { throttle = turn = 0; }
+            // A raised or lost P1 right-hand signal freezes the travel root on
+            // this frame. Travel resumes only after the body has fully lowered.
+            bool standLocksTravel = standRequested || standWeight > .001f || !standInputValid;
+            if (!valid || IsDrinkActive || standLocksTravel) { throttle = turn = 0; }
             else
             {
                 float blend = inputSmoothing <= 0 ? 1 : 1 - Mathf.Exp(-inputSmoothing * dt);
@@ -316,6 +368,7 @@ namespace DigiPhant
             AnimationWeightSum = 0;
             for (int i = 0; i < mixer.GetInputCount(); i++) AnimationWeightSum += mixer.GetInputWeight(i);
             graph.Evaluate(0);
+            ApplyStandingPose();
             // The travel parent alone owns world movement. Remove exported motion-node drift.
             animationMotionRoot.localPosition = motionPosition;
             animationMotionRoot.localRotation = motionRotation;
@@ -335,6 +388,46 @@ namespace DigiPhant
             travelRoot.position = destination;
             if (followElephant && followCamera) followCamera.transform.position = destination + cameraOffset;
             return true;
+        }
+        void UpdateStandingInput(float now, float dt)
+        {
+            standExitThreshold = Mathf.Min(standExitThreshold, standEnterThreshold - .01f);
+            float raw = testStand;
+            standInputValid = true;
+            if (controller != null && controller.inputMode == InputMode.Camera)
+                standInputValid = controller.TryReadMovement(1, Movement.RightHandHeight, now, out raw);
+            if (!standInputValid) { standRequested = false; raw = 0; }
+            float inputBlend = 1 - Mathf.Exp(-dt / Mathf.Max(.01f, standInputSmoothingSeconds));
+            standInput = Mathf.Lerp(standInput, raw, inputBlend);
+            // Raw values use the same Schmitt trigger on both edges. Filtering
+            // is only for diagnostics/visual smoothing, so a held high input
+            // cannot spuriously unlatch on the next frame.
+            if (!standRequested && raw >= standEnterThreshold) standRequested = true;
+            else if (standRequested && raw <= standExitThreshold && standInput <= standExitThreshold) standRequested = false;
+            // Travel locks immediately, but the bone layer waits for a drink
+            // clip to fade completely so the raised pose never pops in.
+            float target = standRequested && drinkWeight < .001f ? 1 : 0;
+            // A bounded transition reaches neutral in the configured duration;
+            // an exponential tail would otherwise keep travel locked for seconds.
+            standWeight = Mathf.MoveTowards(standWeight, target, dt / Mathf.Max(.01f, standBlendSeconds));
+        }
+        void ApplyStandingPose()
+        {
+            if (standWeight <= 0 || drinkWeight >= .001f || standSpineBones == null || standSpineBones.Length == 0) return;
+            // These are deforming spine bones. The travel root, main control and
+            // pelvis stay untouched, so standing cannot move the elephant or camera.
+            float[] distribution = { .65f, .25f, .1f };
+            for (int i = 0; i < standSpineBones.Length; i++)
+                standSpineBones[i].localRotation *= Quaternion.AngleAxis(-standSpineDegrees * Mathf.SmoothStep(0, 1, standWeight) * distribution[Mathf.Min(i, 2)], standSpineAxes[i]);
+        }
+        void ExpandStandingBounds()
+        {
+            if (!standingRenderer) return;
+            // The graph can be rebuilt after inspector clip changes, so apply
+            // this every graph start and restore only when the graph stops.
+            // Imported rigs can use a root-bone coordinate system whose Y axis
+            // is not world-up. Expand symmetrically in local bounds space.
+            standingRenderer.localBounds = new Bounds(originalRendererBounds.center, originalRendererBounds.size * 3f);
         }
         public void ResetPosition()
         {
@@ -358,6 +451,7 @@ namespace DigiPhant
             }
             foreach (var pair in restPose)
                 if (pair.Key) { pair.Key.localPosition = pair.Value.position; pair.Key.localRotation = pair.Value.rotation; }
+            if (standingRenderer) standingRenderer.localBounds = originalRendererBounds;
             StopMotion();
         }
         void OnDisable()
@@ -385,6 +479,8 @@ namespace DigiPhant
                 testForward = GUILayout.HorizontalSlider(testForward, -1, 1);
                 GUILayout.Label("Turn: left / straight / right", label, GUILayout.Width(width));
                 testSteering = GUILayout.HorizontalSlider(testSteering, -1, 1);
+                GUILayout.Label("P1 right hand: lower / stand", label, GUILayout.Width(width));
+                testStand = GUILayout.HorizontalSlider(testStand, 0, 1);
                 if (GUILayout.Button("Stop moving")) StopMotion();
             }
             else GUILayout.Label("Speed and steering use the movement mappings in the Inspector.", label, GUILayout.Width(width));

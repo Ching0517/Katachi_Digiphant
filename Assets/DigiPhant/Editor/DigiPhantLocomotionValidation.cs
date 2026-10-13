@@ -64,8 +64,9 @@ namespace DigiPhant.Editor
             Step(60);
             Check(loco.CurrentAction == "Walk left" && Vector3.Distance(origin, loco.travelRoot.position) > .5f, "Walking and steering failed");
 
-            // Three-person upper-body roles: P1 raises a hand to travel, while
-            // P2's shoulder lean alone rotates the shared travel root.
+            // Three-person upper-body roles: P1 raises a left hand to travel,
+            // P2's shoulder lean alone rotates the shared travel root, and P2's
+            // hands independently own the two front legs.
             loco.ResetPosition();
             bool originalUpperBodyOnly = c.upperBodyOnly;
             c.SetUpperBodyOnly(true);
@@ -76,6 +77,12 @@ namespace DigiPhant.Editor
             Check(loco.steering.sources.Length == 1 && loco.steering.sources[0].performer == 2 &&
                 loco.steering.sources[0].movement == Movement.Lean,
                 "P2 must be the default steering source");
+            var p2LeftLeg = c.controls.Single(x => x.label == "Front left leg");
+            var p2RightLeg = c.controls.Single(x => x.label == "Front right leg");
+            Check(p2LeftLeg.performer == 2 && p2LeftLeg.movement == Movement.LeftHandHeight && !p2LeftLeg.disabled &&
+                p2RightLeg.performer == 2 && p2RightLeg.movement == Movement.RightHandHeight && !p2RightLeg.disabled &&
+                c.controls.Where(x => x.label.StartsWith("Rear ")).All(x => x.disabled),
+                "P2 front-leg and passive rear-leg mappings are incorrect");
             PoseFrame ThreePersonFrame(float p1Hand, float p1Lean, float p2Lean) => new PoseFrame
             {
                 version = 1,

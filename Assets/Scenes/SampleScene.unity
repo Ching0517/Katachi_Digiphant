@@ -4709,6 +4709,7 @@ GameObject:
   - component: {fileID: 557435876}
   - component: {fileID: 557435875}
   - component: {fileID: 557435877}
+  - component: {fileID: 557435878}
   m_Layer: 0
   m_Name: DigiPhant Controls
   m_TagString: Untagged
@@ -4733,8 +4734,9 @@ MonoBehaviour:
   upperBodyOnly: 1
   controls:
   - label: Front left leg
-    performer: 1
-    movement: 2
+    disabled: 0
+    performer: 2
+    movement: 0
     bones:
     - {fileID: 504439227}
     localAxis: {x: 0.00029822259, y: -0.00012132601, z: 0.99999994}
@@ -4742,10 +4744,11 @@ MonoBehaviour:
     sensitivity: 1
     smoothing: 8
     testValue: 0
-    locomotionWeight: 0.35
+    locomotionWeight: 1
   - label: Front right leg
-    performer: 1
-    movement: 3
+    disabled: 0
+    performer: 2
+    movement: 1
     bones:
     - {fileID: 504439226}
     localAxis: {x: -0.00039202961, y: -0.0009600735, z: 0.99999946}
@@ -4753,8 +4756,9 @@ MonoBehaviour:
     sensitivity: 1
     smoothing: 8
     testValue: 0
-    locomotionWeight: 0.35
+    locomotionWeight: 1
   - label: Rear left leg
+    disabled: 1
     performer: 2
     movement: 2
     bones:
@@ -4766,6 +4770,7 @@ MonoBehaviour:
     testValue: 0
     locomotionWeight: 0.35
   - label: Rear right leg
+    disabled: 1
     performer: 2
     movement: 3
     bones:
@@ -4777,6 +4782,7 @@ MonoBehaviour:
     testValue: 0
     locomotionWeight: 0.35
   - label: Head turn
+    disabled: 0
     performer: 1
     movement: 4
     bones:
@@ -4788,6 +4794,7 @@ MonoBehaviour:
     testValue: 0
     locomotionWeight: 1
   - label: Trunk curl
+    disabled: 0
     performer: 3
     movement: 1
     bones:
@@ -4805,6 +4812,7 @@ MonoBehaviour:
     testValue: 0
     locomotionWeight: 1
   - label: Left ear
+    disabled: 0
     performer: 3
     movement: 5
     bones:
@@ -4816,6 +4824,7 @@ MonoBehaviour:
     testValue: 0
     locomotionWeight: 1
   - label: Right ear
+    disabled: 0
     performer: 3
     movement: 5
     bones:
@@ -4827,6 +4836,7 @@ MonoBehaviour:
     testValue: 0
     locomotionWeight: 1
   - label: Tail sway
+    disabled: 0
     performer: 2
     movement: 4
     bones:
@@ -4896,6 +4906,12 @@ MonoBehaviour:
   thumbDownRightEarValue: 1
   earFlapFrequency: 2.5
   closedFistTrunkValue: 1
+  standEnterThreshold: 0.6
+  standExitThreshold: 0.35
+  standBlendSeconds: 0.6
+  standInputSmoothingSeconds: 0.15
+  standSpineDegrees: 45
+  testStand: 0
   forward:
     combination: 1
     sources:
@@ -4922,6 +4938,31 @@ MonoBehaviour:
   stageRadius: 30
   testForward: 0
   testSteering: 0
+--- !u!114 &557435878
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 557435874}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c49ccf5a93b842a19a0c0f884601e213, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DigiPhant.KatachiAudioFeedback
+  controller: {fileID: 0}
+  locomotion: {fileID: 0}
+  elephantTravel: {fileID: 0}
+  finishMarker: {fileID: 1629905924}
+  drinkClip: {fileID: 8300000, guid: 9ef3f284a7db4bd2a919cb85a6248241, type: 3}
+  turnClip: {fileID: 8300000, guid: 48d8a74d0c304d36b798a17e273e42fb, type: 3}
+  walkClip: {fileID: 8300000, guid: 8d76947bc7ff49d08a82c4744133d4bc, type: 3}
+  finishClip: {fileID: 8300000, guid: e2b7f714d6d04a2d80daa9f1945ee5af, type: 3}
+  walkingSource: {fileID: 0}
+  eventSource: {fileID: 0}
+  finishGateHalfWidth: 2.8
+  turnCooldown: 0.25
+  walkFadeSeconds: 0.06
 --- !u!1 &573559665
 GameObject:
   m_ObjectHideFlags: 0

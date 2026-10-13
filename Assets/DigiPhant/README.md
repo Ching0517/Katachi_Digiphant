@@ -179,6 +179,30 @@ manual animation graph owns the Animator; it evaluates the gait before gesture
 offsets are applied. The supplied in-place clips drive the pose, and a parent
 transform handles world travel, avoiding double root motion.
 
+## Audio feedback
+
+The `SampleScene` scene includes a **Katachi Audio Feedback** component on the
+elephant controller. It observes the final locomotion state and plays four
+assigned clips:
+
+- **Walk:** a looping clip starts when the elephant is actually moving and
+  fades out when movement stops.
+- **Turn:** a one-shot plays when the action changes into a left or right turn;
+  the short cooldown prevents rapid retriggering while steering.
+- **Drink:** a one-shot plays when the drink gesture begins and immediately
+  stops the walking loop.
+- **Finish:** a one-shot plays when the elephant crosses the finish marker
+  inside its configured gate. The finish event has highest priority, stops the
+  walking loop, and is accepted only once until the component is reset.
+
+Finish takes priority over drink and turning; drink takes priority over turning
+and walking. Audio is presentation feedback only and does not change tracking,
+locomotion, or gesture input. The component's **walkingSource** is looped and
+its **eventSource** is used for the one-shot clips. Scene references, clips,
+sources, finish gate width, turn cooldown, and walk fade time are configured on
+the **Katachi Audio Feedback** component. The supported scene reference for the
+turn sound is `Turn.wav`; `Turn.m4a` is retained as the source recording.
+
 ## Files and validation
 
 - `Runtime/DigiPhantController.cs`: mappings, calibration, UDP receiver, smoothing,

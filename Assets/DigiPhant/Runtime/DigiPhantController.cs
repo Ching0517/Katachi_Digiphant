@@ -29,6 +29,8 @@ namespace DigiPhant
     [Serializable] public class BoneControl
     {
         public string label;
+        [Tooltip("Disable a legacy mapping while retaining its scene binding.")]
+        public bool disabled;
         [Range(1, 4)] public int performer = 1;
         public Movement movement;
         public Transform[] bones;
@@ -97,6 +99,7 @@ namespace DigiPhant
                 gameObject.AddComponent<DigiPhantRecording>();
             previousCount = performerCount;
             previousUpperBodyOnly = upperBodyOnly;
+            ApplyThreePerformerBodyPreset();
             ClearTracking();
             nextCountRequest = 0;
             ReceivedFrames = 0;
@@ -112,8 +115,11 @@ namespace DigiPhant
             {
                 switch (c.label)
                 {
-                    case "Front left leg": case "Front right leg": c.performer = 1; break;
-                    case "Rear left leg": case "Rear right leg": case "Tail sway":
+                    case "Front left leg": case "Front right leg": c.performer = Mathf.Min(2, performerCount); break;
+                    case "Rear left leg": case "Rear right leg":
+                        c.disabled = true;
+                        c.performer = Mathf.Min(2, performerCount); break;
+                    case "Tail sway":
                         c.performer = Mathf.Min(2, performerCount); break;
                     case "Head turn":
                         c.performer = performerCount >= 3 ? 1 : performerCount; break;
@@ -123,11 +129,28 @@ namespace DigiPhant
                     default: c.performer = Mathf.Clamp(c.performer, 1, performerCount); break;
                 }
             }
-            GetComponent<DigiPhantLocomotion>()?.ClampPerformers(performerCount);
+            ApplyThreePerformerBodyPreset();
+            var locomotion = GetComponent<DigiPhantLocomotion>();
+            locomotion?.ClampPerformers(performerCount);
+            if (performerCount >= 3 && locomotion != null && locomotion.steering.sources.Length == 1 &&
+                locomotion.steering.sources[0].movement == Movement.Lean)
+                locomotion.steering.sources[0].performer = 2;
             ClearTracking();
             ResetControls();
             nextCountRequest = 0;
             Status = "Group size changed. Set neutral pose again in Camera mode.";
+        }
+        // The named bindings are part of the supplied three-performer scene.
+        // Keep this narrow so custom controls retain their own assignments.
+        void ApplyThreePerformerBodyPreset()
+        {
+            if (performerCount < 3) return;
+            foreach (var c in controls)
+            {
+                if (c.label == "Front left leg") { c.performer = 2; c.movement = Movement.LeftHandHeight; c.disabled = false; c.locomotionWeight = 1; }
+                else if (c.label == "Front right leg") { c.performer = 2; c.movement = Movement.RightHandHeight; c.disabled = false; c.locomotionWeight = 1; }
+                else if (c.label == "Rear left leg" || c.label == "Rear right leg") c.disabled = true;
+            }
         }
         public void SetUpperBodyOnly(bool enabled)
         {
@@ -169,6 +192,7 @@ namespace DigiPhant
         {
             calibrationDeadline = -1;
             GetComponent<DigiPhantLocomotion>()?.StopMotion();
+            GetComponent<DigiPhantLocomotion>()?.ForceLower();
             IsCalibrated = false;
             Array.Clear(confidence, 0, confidence.Length);
             Array.Clear(neutral, 0, neutral.Length);
@@ -367,6 +391,7 @@ namespace DigiPhant
             var locomotion = GetComponent<DigiPhantLocomotion>();
             foreach (var c in controls)
             {
+                if (c.disabled) continue;
                 if (locomotion != null && locomotion.ShouldGestureOwn(c.label)) continue;
                 if (TryGetMovementReadinessIssue(c.performer, c.movement, now, out string issue))
                 { Status = "Neutral pose not saved. " + c.label + ": " + issue; return false; }
@@ -393,6 +418,7 @@ namespace DigiPhant
             bool animated = locomotion != null && locomotion.isActiveAndEnabled && locomotion.Evaluate(now, dt);
             foreach (var c in controls)
             {
+                if (c.disabled) { c.current = 0; continue; }
                 float target = 0;
                 int i = c.performer - 1, k = (int)c.movement;
                 if (i >= 0 && i < performerCount && k >= 0 && k < 6)
@@ -456,7 +482,8 @@ namespace DigiPhant
             if (count != performerCount) SetPerformerCount(count);
             bool upper = GUILayout.Toolbar(upperBodyOnly ? 1 : 0, new[] { "Full body", "Seated / upper body" }) == 1;
             if (upper != upperBodyOnly) SetUpperBodyOnly(upper);
-            if (upperBodyOnly) Label("Keep shoulders and hands visible. Raise hands for legs; tilt shoulders for steering, head and tail. Solo: left hand also drives travel; right hand curls trunk.");
+            if (upperBodyOnly && performerCount >= 3) Label("P1: left hand moves; right hand raises the elephant. P2: left/right hands swing left/right front legs and leaning turns. P3 gestures use the HAND ZONE: fist trunk, Victory drink, thumbs ears.");
+            else if (upperBodyOnly) Label("Keep shoulders and hands visible. Raise hands for legs; tilt shoulders for steering, head and tail. Solo: left hand also drives travel; right hand curls trunk.");
             int mode = GUILayout.Toolbar((int)inputMode, new[] { "Test sliders", "Camera" });
             if (mode != (int)inputMode) SetInputMode((InputMode)mode);
             bool gestures = GUILayout.Toggle(enableGestureActions, "Enable hand gesture actions");
