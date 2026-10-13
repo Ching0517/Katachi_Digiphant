@@ -1,9 +1,64 @@
 # Katachi DigiPhant
 
-這是一個 Unity 6 URP 專案：以 MediaPipe webcam tracking 控制大象，並在同一個場景加入 Savannah 課程。主要場景是 `Assets/Scenes/SampleScene.unity`。
+Katachi DigiPhant is a collaborative Unity experience in which three people control one virtual elephant through body movements and hand gestures. The group works together to move through a Savannah course, steer the elephant, animate its body, and perform actions such as drinking water.
 
-完整的實際環境、資料路徑、修改、測試證據、復原方式與待辦事項請看 [DIGIPHANT_SETUP.md](DIGIPHANT_SETUP.md)。
+## Three-Person Controls
 
-快速開始：用 Unity `6000.6.3f1` 開啟專案並開啟 `Assets/Scenes/SampleScene.unity`，按 Play，選 `1 person`、`Seated / upper body`、`Camera`。等待自己出現在 preview 後按 `Set neutral pose (10 seconds)`，保持坐姿和雙手在畫面內。錄影輸出到 `Recordings/<session>/performance.mp4`；請自行檢查後上傳團隊 Drive，影片不會自動上傳，也不提交到 Git。
+The current scene divides control between three performers:
 
-Starter clone 位於專案外的 `DigiPhantStarter/`，追蹤環境位於 `DigiPhantStarter/Tracking/.venv/`。重建流程與實際限制見 setup 報告。
+| Performer | Input | Elephant action |
+| --- | --- | --- |
+| P1 | Raise or lower the left hand relative to the calibrated position | Move forward or backward; raising it farther increases speed |
+| P1 | Raise the right hand | Raise the elephant into a standing pose and pause travel |
+| P1 | Lower the right hand | Return to the normal pose and allow travel to resume |
+| P1 | Lean sideways | Turn the elephant's head |
+| P2 | Raise or lower the left hand | Swing the front left leg |
+| P2 | Raise or lower the right hand | Swing the front right leg |
+| P2 | Tilt the shoulders sideways | Steer left or right and sway the tail |
+| P3 | Show a thumbs-up gesture | Flap the left ear |
+| P3 | Show a thumbs-down gesture | Flap the right ear |
+| P3 | Make a closed fist | Curl the trunk |
+| P3 | Show a victory / peace sign | Start the drinking animation |
+
+P3 should present gestures inside the camera preview's **HAND ZONE**. Gesture recognition reads this area rather than identifying the hand by performer ID, so other participants should keep their hands out of it.
+
+Drinking plays once per gesture activation. Release the victory sign before triggering it again. Standing takes priority over drinking, and travel pauses during either action.
+
+## Which Mode Should We Select?
+
+For the intended three-person setup, select:
+
+- **3 people**
+- **Seated / upper body**
+- **Camera**
+- **Enable locomotion**
+
+Upper-body mode lets participants use their hands and shoulders without requiring their feet to remain visible. **Test sliders** can be used to try the elephant's controls without live body tracking.
+
+## Models and Assets
+
+The project uses three main model resources:
+
+- **MediaPipe Pose Landmarker Full** (`pose_landmarker_full.task`) tracks body landmarks and provides the movement measurements used for travel, steering, and body control.
+- **MediaPipe Gesture Recognizer** (`gesture_recognizer.task`) recognizes the hand gestures used for the ears, trunk, and drinking action.
+- **The supplied rigged elephant model** in `Assets/Elephant/` provides the character, skeleton, and animation clips. Using the supplied asset preserves compatibility with the existing bone mappings and animations.
+
+The Savannah course provides the environment and finish marker. Tracking runs locally through a Python bridge and sends control data to Unity.
+
+## Getting Started
+
+1. Open the project in **Unity 6000.6.3f1**.
+2. Open `Assets/Scenes/SampleScene.unity`.
+3. Restore the tracking dependencies and elephant assets if this is a fresh checkout. See `DIGIPHANT_SETUP.md`.
+4. Press **Play** and select the settings listed above.
+5. Wait for the performers to be detected.
+6. Select **Set neutral pose (10 seconds)** and hold a comfortable neutral position with shoulders and hands visible.
+7. Begin controlling the elephant together.
+
+Calibrate with P1's left hand around waist height, leaving room to raise and lower it. Keep participants clearly visible and avoid overlapping bodies.
+
+## Audio Feedback
+
+The scene includes sounds for walking, turning, drinking, and crossing the finish line.
+
+**Current known issue:** After the finish sound plays, the other action sounds remain disabled until Play mode is restarted.
