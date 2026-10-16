@@ -4848,7 +4848,7 @@ MonoBehaviour:
     testValue: 0
     locomotionWeight: 1
   port: 5055
-  minimumConfidence: 0.5
+  minimumConfidence: 0.088
   trackingTimeout: 0.5
   enableGestureActions: 1
   gestureMinimumConfidence: 0.5

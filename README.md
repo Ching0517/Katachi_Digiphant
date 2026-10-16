@@ -60,6 +60,15 @@ The Savannah course provides the environment and finish marker. Tracking runs lo
 
 Calibrate with P1's left hand around waist height, leaving room to raise and lower it. Keep participants clearly visible and avoid overlapping bodies.
 
+## Submission materials
+
+- [Setup and reproduction guide](DIGIPHANT_SETUP.md)
+- [Tracking patch](TrackingPatches/bridge-windows-udp-reset.patch)
+- [Tracking source snapshot and pinned dependencies](TrackingOverrides/README.md)
+- [Pinned Gesture Recognizer model manifest](Tools/GestureRecognizerModel.json)
+
+Performance video: not uploaded yet. Upload the final recording to the team Drive and replace this line with its share link before submission.
+
 ## Audio Feedback
 
 The scene includes sounds for walking, turning, drinking, and crossing the finish line.
