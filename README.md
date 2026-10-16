@@ -1,5 +1,7 @@
 # Katachi DigiPhant
 
+### Team: Katachi
+### Members: Ko-Qin Mei, Kai Zhang, Teresa Yang
 Katachi DigiPhant is a collaborative Unity experience in which three people control one virtual elephant through body movements and hand gestures. The group works together to move through a Savannah course, steer the elephant, animate its body, and perform actions such as drinking water.
 
 ## Three-Person Controls
