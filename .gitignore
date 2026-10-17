@@ -12,6 +12,11 @@
 **/__pycache__/
 /Recordings/
 /recordings/
+*.mov
+*.mp4
+*.m4v
+*.avi
+*.mkv
 
 # Instructor starter clone and large shared elephant assets are restored from
 # the recorded starter commit in DIGIPHANT_SETUP.md.

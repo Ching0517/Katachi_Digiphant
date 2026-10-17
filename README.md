@@ -64,6 +64,7 @@ Calibrate with P1's left hand around waist height, leaving room to raise and low
 
 - [Project documentation: Katachi DigiPhant Journal](https://jungle-turkey-eb8.notion.site/Katachi-Journal-3f642e81d14680a19b6fefdd56de5f02)
 - [Setup and reproduction guide](DIGIPHANT_SETUP.md)
+- [Group reflection](Reflection.md)
 - [Tracking patch](TrackingPatches/bridge-windows-udp-reset.patch)
 - [Tracking source snapshot and pinned dependencies](TrackingOverrides/README.md)
 - [Pinned Gesture Recognizer model manifest](Tools/GestureRecognizerModel.json)
