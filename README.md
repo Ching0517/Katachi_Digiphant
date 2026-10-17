@@ -68,7 +68,7 @@ Calibrate with P1's left hand around waist height, leaving room to raise and low
 - [Tracking source snapshot and pinned dependencies](TrackingOverrides/README.md)
 - [Pinned Gesture Recognizer model manifest](Tools/GestureRecognizerModel.json)
 
-Performance video: not uploaded yet. Upload the final recording to the team Drive and replace this line with its share link before submission.
+▶️ **[Watch the final Digital Twins demo video on YouTube](https://www.youtube.com/watch?v=u-EAxdFBDsU)**
 
 ## Audio Feedback
 
